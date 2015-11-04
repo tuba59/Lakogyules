@@ -35,7 +35,7 @@
         <!--android:src="" />-->
 
     <Button
-        android:id="@+id/button_scan"
+        android:id="@+id/button_users"
         android:layout_width="200dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
@@ -44,7 +44,7 @@
         android:text="Szavazók megadása" />
 
     <Button
-        android:id="@+id/button_database"
+        android:id="@+id/button_start"
         android:layout_width="200dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
@@ -53,12 +53,33 @@
         android:text="Szavazás indítás"/>
 
     <Button
-        android:id="@+id/button_about"
+        android:id="@+id/button_carts"
         android:layout_width="200dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:minHeight="48dp"
         android:minWidth="88dp"
         android:text="Szavazólapok elkészítése"/>
+
+    <Button
+        android:id="@+id/button_about"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:minHeight="48dp"
+        android:minWidth="88dp"
+        android:text="Készítők" />
+
+    <TextView
+        android:id="@+id/textViewDebug"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ellipsize="none"
+        android:fontFamily="sans-serif-thin"
+        android:text="debug info"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:textSize="20sp"
+        android:textStyle="bold|italic"
+        android:typeface="normal" />
 
 </LinearLayout>
