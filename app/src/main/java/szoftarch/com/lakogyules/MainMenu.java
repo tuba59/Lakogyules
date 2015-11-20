@@ -1,16 +1,19 @@
 package szoftarch.com.lakogyules;
 
 import android.accounts.AccountManager;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.pdf.PdfDocument;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Menu;
@@ -35,6 +38,9 @@ import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.services.script.model.ExecutionRequest;
 import com.google.api.services.script.model.Operation;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,9 +60,10 @@ public class MainMenu extends Activity {
     private static final String API_EXAMPLE_SCRIPT = "getFoldersUnder";
     private static final String API_USERS_SCRIPT = "setUsers";
     private static final String API_POLLSTART_SCRIPT = "startPoll";
+    private static final String API_GET_USERS_AND_SHARES = "getUsersWithShare";
 
     private static final String PREF_ACCOUNT_NAME = "accountName";
-    private static final String[] SCOPES = { "https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets" };
+    private static final String[] SCOPES = {"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,7 +110,8 @@ public class MainMenu extends Activity {
         createCarts.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-//                startActivity(databaseIntent);
+                executeScript(API_GET_USERS_AND_SHARES);
+                generatePDF();
             }
         });
 
@@ -137,12 +145,13 @@ public class MainMenu extends Activity {
         }
         return super.onOptionsItemSelected(item);
     }
+
     /**
      * Extend the given HttpRequestInitializer (usually a credentials object)
      * with additional initialize() instructions.
      *
      * @param requestInitializer the initializer to copy and adjust; typically
-     *         a credential object.
+     *                           a credential object.
      * @return an initializer with an extended read timeout.
      */
     private static HttpRequestInitializer setHttpTimeout(
@@ -159,21 +168,23 @@ public class MainMenu extends Activity {
             }
         };
     }
+
     /**
      * Called when an activity launched here (specifically, AccountPicker
      * and authorization) exits, giving you the requestCode you started it with,
      * the resultCode it returned, and any additional data from it.
+     *
      * @param requestCode code indicating which activity result is incoming.
-     * @param resultCode code indicating the result of the incoming
-     *     activity result.
-     * @param data Intent (containing result data) returned by incoming
-     *     activity result.
+     * @param resultCode  code indicating the result of the incoming
+     *                    activity result.
+     * @param data        Intent (containing result data) returned by incoming
+     *                    activity result.
      */
     @Override
     protected void onActivityResult(
             int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        switch(requestCode) {
+        switch (requestCode) {
             case REQUEST_GOOGLE_PLAY_SERVICES:
                 if (resultCode != RESULT_OK) {
                     isGooglePlayServicesAvailable();
@@ -235,6 +246,7 @@ public class MainMenu extends Activity {
 
     /**
      * Checks whether the device currently has a network connection.
+     *
      * @return true if the device has a network connection, false otherwise.
      */
     private boolean isDeviceOnline() {
@@ -248,8 +260,9 @@ public class MainMenu extends Activity {
      * Check that Google Play services APK is installed and up to date. Will
      * launch an error dialog for the user to update Google Play Services if
      * possible.
+     *
      * @return true if Google Play Services is available and up to
-     *     date on this device; false otherwise.
+     * date on this device; false otherwise.
      */
     private boolean isGooglePlayServicesAvailable() {
         final int connectionStatusCode =
@@ -257,7 +270,7 @@ public class MainMenu extends Activity {
         if (GooglePlayServicesUtil.isUserRecoverableError(connectionStatusCode)) {
             showGooglePlayServicesAvailabilityErrorDialog(connectionStatusCode);
             return false;
-        } else if (connectionStatusCode != ConnectionResult.SUCCESS ) {
+        } else if (connectionStatusCode != ConnectionResult.SUCCESS) {
             return false;
         }
         return true;
@@ -266,8 +279,9 @@ public class MainMenu extends Activity {
     /**
      * Display an error dialog showing that Google Play Services is missing
      * or out of date.
+     *
      * @param connectionStatusCode code describing the presence (or lack of)
-     *     Google Play Services on this device.
+     *                             Google Play Services on this device.
      */
     void showGooglePlayServicesAvailabilityErrorDialog(
             final int connectionStatusCode) {
@@ -299,6 +313,7 @@ public class MainMenu extends Activity {
 
         /**
          * Background task to call Google Apps Script Execution API.
+         *
          * @param params no parameters needed for this task.
          */
         @Override
@@ -364,9 +379,9 @@ public class MainMenu extends Activity {
                 switch (scriptName) {
                     case API_EXAMPLE_SCRIPT:
                         Map<String, String> folderSet =
-                                (Map<String, String>)(op.getResponse().get("result"));
+                                (Map<String, String>) (op.getResponse().get("result"));
 
-                        for (String id: folderSet.keySet()) {
+                        for (String id : folderSet.keySet()) {
                             returnList.add(
                                     String.format("%s (%s)", folderSet.get(id), id));
                         }
@@ -378,6 +393,13 @@ public class MainMenu extends Activity {
                         startActivity(i);
                         break;
                     case API_POLLSTART_SCRIPT:
+                        break;
+                    case API_GET_USERS_AND_SHARES:
+                        ArrayList<String> userList =
+                                (ArrayList<String>) (op.getResponse().get("result"));
+
+                            returnList.addAll(userList);
+
                         break;
                 }
 
@@ -392,7 +414,7 @@ public class MainMenu extends Activity {
          *
          * @param op the Operation returning an error response
          * @return summary of error response, or null if Operation returned no
-         *     error
+         * error
          */
         private String getScriptError(Operation op) {
             if (op.getError() == null) {
@@ -405,7 +427,7 @@ public class MainMenu extends Activity {
             // be cast as Maps).
             Map<String, Object> detail = op.getError().getDetails().get(0);
             List<Map<String, Object>> stacktrace =
-                    (List<Map<String, Object>>)detail.get("scriptStackTraceElements");
+                    (List<Map<String, Object>>) detail.get("scriptStackTraceElements");
 
             java.lang.StringBuilder sb =
                     new StringBuilder("\nScript error message: ");
@@ -466,5 +488,62 @@ public class MainMenu extends Activity {
         }
     }
 
+    @TargetApi(Build.VERSION_CODES.KITKAT)
+    public void generatePDF() {
+        /*// create a new document
+        PdfDocument document = new PdfDocument();
+
+        // crate a page description
+        PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(100,100, 1).create();
+
+        // start a page
+        PdfDocument.Page page = document.startPage(pageInfo);
+
+        // draw something on the page
+        View content = (ViewGroup)getWindow().getDecorView();
+        content.draw(page.getCanvas());
+
+        // finish the page
+        document.finishPage(page);
+
+        // add more pages
+
+        // write the document content
+        try {
+            File file = Environment.getExternalStorageDirectory();
+            document.writeTo(new FileOutputStream(file));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // close the document
+        document.close();*/
+
+        PdfDocument document = new PdfDocument();
+        try{
+
+            View v = findViewById(android.R.id.content);
+            PdfDocument.PageInfo.Builder pageBuilder = new PdfDocument.PageInfo.Builder(v.getWidth(), v.getHeight(), 1);
+            PdfDocument.Page page = document.startPage(pageBuilder.create());
+            v.draw(page.getCanvas());
+            document.finishPage(page);
+
+            File pdfDirPath = new File(getExternalCacheDir(), "pdfs");
+            pdfDirPath.mkdirs();
+            File file = new File(pdfDirPath, "pdfsend.pdf");
+            FileOutputStream os = new FileOutputStream(file);
+            document.writeTo(os);
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally{
+            if(document!=null){
+                document.close();
+            }
+        }
+
+    }
 
 }
