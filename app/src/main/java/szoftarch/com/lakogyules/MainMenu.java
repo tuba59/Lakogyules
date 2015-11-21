@@ -62,14 +62,16 @@ public class MainMenu extends Activity {
     private TextView mOutputText;
     private String voteResult;
 
-    String url = "https://docs.google.com/spreadsheets/d/11yudzLUrJ8-oA_XtfUsNdLYn3GhFafL7Z07JxCkp7oc/edit?usp=drivesdk";
+    //String url = "https://docs.google.com/spreadsheets/d/11yudzLUrJ8-oA_XtfUsNdLYn3GhFafL7Z07JxCkp7oc/edit?usp=drivesdk";
     static final int REQUEST_ACCOUNT_PICKER = 1000;
     static final int REQUEST_AUTHORIZATION = 1001;
     static final int REQUEST_GOOGLE_PLAY_SERVICES = 1002;
     static final String scriptId = "MXa9tRpljg398tX2mIRruFz81x5CofiQN";
     private static final String API_EXAMPLE_SCRIPT = "getFoldersUnder";
-    private static final String API_USERS_SCRIPT = "setUsers";
-    private static final String API_POLLSTART_SCRIPT = "startPoll";
+    private static final String API_SET_USERS_SCRIPT = "setUsers";
+    private static final String API_START_POLL_SCRIPT = "startPoll";
+    private static final String API_END_POLL_SCRIPT = "endPoll";
+    private static final String API_DO_VOTE_SCRIPT = "doVote";
     private static final String API_GET_USERS_AND_SHARES = "getUsersWithShare";
 
     private static final String PREF_ACCOUNT_NAME = "accountName";
@@ -95,7 +97,7 @@ public class MainMenu extends Activity {
             @Override
             public void onClick(View v) {
                 if (isGooglePlayServicesAvailable()) {
-                    executeScript(API_USERS_SCRIPT);
+                    executeScript(API_SET_USERS_SCRIPT);
                 } else {
                     mOutputText.setText("Google Play Services required: " +
                             "after installing, close and relaunch this app.");
@@ -125,7 +127,6 @@ public class MainMenu extends Activity {
             @Override
             public void onClick(View v) {
                 executeScript(API_GET_USERS_AND_SHARES);
-                generatePDF();
             }
         });
 
@@ -216,7 +217,7 @@ public class MainMenu extends Activity {
                         editor.putString(PREF_ACCOUNT_NAME, accountName);
                         editor.apply();
                     }
-                    executeScript(API_USERS_SCRIPT);
+                    executeScript(API_SET_USERS_SCRIPT);
                 } else if (resultCode == RESULT_CANCELED) {
                     mOutputText.setText("Account unspecified.");
                 }
@@ -403,9 +404,16 @@ public class MainMenu extends Activity {
                     String sheetId = "1234";
                     params.add(sheetId);
                     break;
-                case API_USERS_SCRIPT:
+                case API_END_POLL_SCRIPT:
+                    // TODO: itt tudni kell a sheet nevet (tipikusan 'Szavazás x')
+                    params.add("Szavazás 1");
                     break;
-                case API_POLLSTART_SCRIPT:
+                case API_DO_VOTE_SCRIPT:
+                    // TODO: itt tudni kell a sheet nevet (tipikusan 'Szavazás x'), kicsoda, tulajdona (szám), mire szavaz (-1,0,1)
+                    params.add("Szavazás 1");
+                    params.add("Nagy Mama");
+                    params.add("10");
+                    params.add("1");
                     break;
             }
 
@@ -443,19 +451,37 @@ public class MainMenu extends Activity {
                                     String.format("%s (%s)", folderSet.get(id), id));
                         }
                         break;
-                    case API_USERS_SCRIPT:
+                    case API_SET_USERS_SCRIPT:
+                        // megnyitja a google sheets-et
                         Intent i = new Intent(Intent.ACTION_VIEW);
                         returnList.add((String) op.getResponse().get("result"));
                         i.setData(Uri.parse((String) op.getResponse().get("result")));
                         startActivity(i);
                         break;
-                    case API_POLLSTART_SCRIPT:
+                    case API_START_POLL_SCRIPT:
+                        returnList.add((String) op.getResponse().get("result"));
+                        // TODO: elindítani a beolvasást, meg átadni valahogy a Sheet nevet (result). Lehet osztály változó is, és akkor nem kell.
+                        break;
+                    case API_DO_VOTE_SCRIPT:
+                        returnList.add((String) op.getResponse().get("result"));
+                        // TODO: Nemtom, milyen nehéz visszatérni a QR olvasóhoz, itt kéne sztem
+                        break;
+                    case API_END_POLL_SCRIPT:
+                        // megnyitja a megfelelő szavazási eredményeket google sheets-en
+                        Intent in = new Intent(Intent.ACTION_VIEW);
+                        returnList.add((String) op.getResponse().get("result"));
+                        in.setData(Uri.parse((String) op.getResponse().get("result")));
+                        startActivity(in);
                         break;
                     case API_GET_USERS_AND_SHARES:
-                        ArrayList<String> userList =
-                                (ArrayList<String>) (op.getResponse().get("result"));
-
-                            returnList.addAll(userList);
+                        Map<String, String> userSet =
+                                (Map<String, String>) (op.getResponse().get("result"));
+                        for (String id : userSet.keySet()) {
+                            returnList.add(
+                                    String.format("%s (%s)", userSet.get(id), id));
+                        }
+                        if(!userSet.isEmpty())
+                            generatePDF(userSet);
 
                         break;
                 }
@@ -546,7 +572,7 @@ public class MainMenu extends Activity {
     }
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
-    public void generatePDF() {
+    public void generatePDF(Map<String, String> usersWithShare) {
         /*// create a new document
         PdfDocument document = new PdfDocument();
 
@@ -575,6 +601,11 @@ public class MainMenu extends Activity {
 
         // close the document
         document.close();*/
+
+        // példa az iterálásra a usereken
+        for (String id : usersWithShare.keySet()) {
+            String asd = String.format("%s (%s)", usersWithShare.get(id), id);
+        }
 
         PdfDocument document = new PdfDocument();
         try{
