@@ -85,5 +85,11 @@
             android:textStyle="bold|italic"
             android:typeface="normal" />
 
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/imageViewQR"
+            android:layout_gravity="center_horizontal" />
+
     </LinearLayout>
 </ScrollView>

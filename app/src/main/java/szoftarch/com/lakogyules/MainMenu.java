@@ -3,11 +3,15 @@ package szoftarch.com.lakogyules;
 import android.accounts.AccountManager;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.pdf.PdfDocument;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -20,6 +24,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.google.android.gms.auth.GoogleAuthException;
@@ -37,6 +42,10 @@ import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.services.script.model.ExecutionRequest;
 import com.google.api.services.script.model.Operation;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -51,6 +60,7 @@ public class MainMenu extends Activity {
     GoogleAccountCredential mCredential;
     ProgressDialog mProgress;
     private TextView mOutputText;
+    private String voteResult;
 
     String url = "https://docs.google.com/spreadsheets/d/11yudzLUrJ8-oA_XtfUsNdLYn3GhFafL7Z07JxCkp7oc/edit?usp=drivesdk";
     static final int REQUEST_ACCOUNT_PICKER = 1000;
@@ -97,11 +107,15 @@ public class MainMenu extends Activity {
         startPoll.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (isGooglePlayServicesAvailable()) {
-                    executeScript(API_EXAMPLE_SCRIPT);
-                } else {
-                    mOutputText.setText("Google Play Services required: " +
-                            "after installing, close and relaunch this app.");
+                try {
+                    Intent intent = new Intent("com.google.zxing.client.android.SCAN");
+                    intent.putExtra("SCAN_MODE", "QR_CODE_MODE"); // "PRODUCT_MODE for bar codes
+
+                    startActivityForResult(intent, 0);
+                } catch (Exception e) {
+                    Uri marketUri = Uri.parse("market://details?id=com.google.zxing.client.android");
+                    Intent marketIntent = new Intent(Intent.ACTION_VIEW,marketUri);
+                    startActivity(marketIntent);
                 }
             }
         });
@@ -120,7 +134,6 @@ public class MainMenu extends Activity {
 
             @Override
             public void onClick(View v) {
-//                startActivity(aboutIntent);
 
             }
         });
@@ -214,6 +227,48 @@ public class MainMenu extends Activity {
                 }
                 break;
         }
+        if (requestCode == 0) {
+            if (resultCode == RESULT_OK) {
+                final String contents = data.getStringExtra("SCAN_RESULT");
+
+                // 1. Instantiate an AlertDialog.Builder with its constructor
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainMenu.this);
+
+                // 2. Chain together various setter methods to set the dialog characteristics
+                builder.setTitle("Szavazat megadása")
+                        .setItems(R.array.choice_array, new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                switch (which){
+                                    case 0:
+                                        voteResult = contents + " - Igen";
+                                        break;
+                                    case 1:
+                                        voteResult = contents + " - Nem";
+                                        break;
+                                    case 2:
+                                        voteResult = contents + " - Tartózkodott";
+                                        break;
+                                }
+                                mOutputText.append("\n" + voteResult);
+                                try {
+                                    Intent intent = new Intent("com.google.zxing.client.android.SCAN");
+                                    intent.putExtra("SCAN_MODE", "QR_CODE_MODE"); // "PRODUCT_MODE for bar codes
+
+                                    startActivityForResult(intent, 0);
+                                } catch (Exception e) {
+                                    Uri marketUri = Uri.parse("market://details?id=com.google.zxing.client.android");
+                                    Intent marketIntent = new Intent(Intent.ACTION_VIEW,marketUri);
+                                    startActivity(marketIntent);
+                                }
+                            }
+                        })
+                        .create()
+                        .show();
+            }
+            if(resultCode == 999){
+
+            }
+        }
 
         super.onActivityResult(requestCode, resultCode, data);
     }
@@ -291,6 +346,8 @@ public class MainMenu extends Activity {
                 REQUEST_GOOGLE_PLAY_SERVICES);
         dialog.show();
     }
+
+
 
     /**
      * An asynchronous task that handles the Google Apps Script Execution API call.
@@ -521,6 +578,23 @@ public class MainMenu extends Activity {
 
         PdfDocument document = new PdfDocument();
         try{
+
+            QRCodeWriter writer = new QRCodeWriter();
+            try {
+                BitMatrix bitMatrix = writer.encode("Józsi: " + "40", BarcodeFormat.QR_CODE, 512, 512);
+                int width = bitMatrix.getWidth();
+                int height = bitMatrix.getHeight();
+                Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+                for (int x = 0; x < width; x++) {
+                    for (int y = 0; y < height; y++) {
+                        bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                    }
+                }
+                ((ImageView) findViewById(R.id.imageViewQR)).setImageBitmap(bmp);
+
+            } catch (WriterException e) {
+                e.printStackTrace();
+            }
 
             View v = findViewById(android.R.id.content);
             PdfDocument.PageInfo.Builder pageBuilder = new PdfDocument.PageInfo.Builder(v.getWidth(), v.getHeight(), 1);
