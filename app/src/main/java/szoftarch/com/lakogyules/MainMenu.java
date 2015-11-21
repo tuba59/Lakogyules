@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -76,6 +77,9 @@ public class MainMenu extends Activity {
 
     private static final String PREF_ACCOUNT_NAME = "accountName";
     private static final String[] SCOPES = {"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"};
+    private String currentSheetName;
+    private String currentVoterName;
+    private String  currentVoterShare;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,16 +113,7 @@ public class MainMenu extends Activity {
         startPoll.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                try {
-                    Intent intent = new Intent("com.google.zxing.client.android.SCAN");
-                    intent.putExtra("SCAN_MODE", "QR_CODE_MODE"); // "PRODUCT_MODE for bar codes
-
-                    startActivityForResult(intent, 0);
-                } catch (Exception e) {
-                    Uri marketUri = Uri.parse("market://details?id=com.google.zxing.client.android");
-                    Intent marketIntent = new Intent(Intent.ACTION_VIEW,marketUri);
-                    startActivity(marketIntent);
-                }
+                executeScript(API_START_POLL_SCRIPT);
             }
         });
 
@@ -231,6 +226,9 @@ public class MainMenu extends Activity {
         if (requestCode == 0) {
             if (resultCode == RESULT_OK) {
                 final String contents = data.getStringExtra("SCAN_RESULT");
+                int indexOfSeparator = contents.indexOf("=");
+                currentVoterName = contents.substring(0,indexOfSeparator);
+                currentVoterShare = contents.substring(indexOfSeparator+1);
 
                 // 1. Instantiate an AlertDialog.Builder with its constructor
                 AlertDialog.Builder builder = new AlertDialog.Builder(MainMenu.this);
@@ -241,20 +239,22 @@ public class MainMenu extends Activity {
                             public void onClick(DialogInterface dialog, int which) {
                                 switch (which){
                                     case 0:
-                                        voteResult = contents + " - Igen";
+                                        voteResult = "1";
+                                        executeScript(API_DO_VOTE_SCRIPT);
                                         break;
                                     case 1:
-                                        voteResult = contents + " - Nem";
+                                        voteResult = "-1";
+                                        executeScript(API_DO_VOTE_SCRIPT);
                                         break;
                                     case 2:
-                                        voteResult = contents + " - Tartózkodott";
+                                        voteResult = "0";
+                                        executeScript(API_DO_VOTE_SCRIPT);
                                         break;
                                 }
                                 mOutputText.append("\n" + voteResult);
                                 try {
                                     Intent intent = new Intent("com.google.zxing.client.android.SCAN");
                                     intent.putExtra("SCAN_MODE", "QR_CODE_MODE"); // "PRODUCT_MODE for bar codes
-
                                     startActivityForResult(intent, 0);
                                 } catch (Exception e) {
                                     Uri marketUri = Uri.parse("market://details?id=com.google.zxing.client.android");
@@ -266,8 +266,31 @@ public class MainMenu extends Activity {
                         .create()
                         .show();
             }
-            if(resultCode == 999){
-
+            if(resultCode == RESULT_CANCELED){
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainMenu.this);
+                builder.setMessage("Biztosan befejezi a szavazást?")
+                        .setNegativeButton("Nem", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                try {
+                                    Intent intent = new Intent("com.google.zxing.client.android.SCAN");
+                                    intent.putExtra("SCAN_MODE", "QR_CODE_MODE"); // "PRODUCT_MODE for bar codes
+                                    startActivityForResult(intent, 0);
+                                } catch (Exception e) {
+                                    Uri marketUri = Uri.parse("market://details?id=com.google.zxing.client.android");
+                                    Intent marketIntent = new Intent(Intent.ACTION_VIEW, marketUri);
+                                    startActivity(marketIntent);
+                                }
+                            }
+                        })
+                        .setPositiveButton("Igen", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                executeScript(API_END_POLL_SCRIPT);
+                            }
+                        })
+                        .create()
+                        .show();
             }
         }
 
@@ -406,14 +429,14 @@ public class MainMenu extends Activity {
                     break;
                 case API_END_POLL_SCRIPT:
                     // TODO: itt tudni kell a sheet nevet (tipikusan 'Szavazás x')
-                    params.add("Szavazás 1");
+                    params.add(currentSheetName);
                     break;
                 case API_DO_VOTE_SCRIPT:
                     // TODO: itt tudni kell a sheet nevet (tipikusan 'Szavazás x'), kicsoda, tulajdona (szám), mire szavaz (-1,0,1)
-                    params.add("Szavazás 1");
-                    params.add("Nagy Mama");
-                    params.add("10");
-                    params.add("1");
+                    params.add(currentSheetName);
+                    params.add(currentVoterName);
+                    params.add(currentVoterShare);
+                    params.add(voteResult);
                     break;
             }
 
@@ -460,11 +483,22 @@ public class MainMenu extends Activity {
                         break;
                     case API_START_POLL_SCRIPT:
                         returnList.add((String) op.getResponse().get("result"));
+                        currentSheetName = (String) op.getResponse().get("result");
                         // TODO: elindítani a beolvasást, meg átadni valahogy a Sheet nevet (result). Lehet osztály változó is, és akkor nem kell.
+                        try {
+                            Intent intent = new Intent("com.google.zxing.client.android.SCAN");
+                            intent.putExtra("SCAN_MODE", "QR_CODE_MODE"); // "PRODUCT_MODE for bar codes
+                            startActivityForResult(intent, 0);
+                        } catch (Exception e) {
+                            Uri marketUri = Uri.parse("market://details?id=com.google.zxing.client.android");
+                            Intent marketIntent = new Intent(Intent.ACTION_VIEW,marketUri);
+                            startActivity(marketIntent);
+                        }
                         break;
                     case API_DO_VOTE_SCRIPT:
                         returnList.add((String) op.getResponse().get("result"));
                         // TODO: Nemtom, milyen nehéz visszatérni a QR olvasóhoz, itt kéne sztem
+
                         break;
                     case API_END_POLL_SCRIPT:
                         // megnyitja a megfelelő szavazási eredményeket google sheets-en
@@ -573,71 +607,55 @@ public class MainMenu extends Activity {
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
     public void generatePDF(Map<String, String> usersWithShare) {
-        /*// create a new document
         PdfDocument document = new PdfDocument();
 
-        // crate a page description
-        PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(100,100, 1).create();
-
-        // start a page
-        PdfDocument.Page page = document.startPage(pageInfo);
-
-        // draw something on the page
-        View content = (ViewGroup)getWindow().getDecorView();
-        content.draw(page.getCanvas());
-
-        // finish the page
-        document.finishPage(page);
-
-        // add more pages
-
-        // write the document content
-        try {
-            File file = Environment.getExternalStorageDirectory();
-            document.writeTo(new FileOutputStream(file));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        // close the document
-        document.close();*/
-
-        // példa az iterálásra a usereken
-        for (String id : usersWithShare.keySet()) {
-            String asd = String.format("%s (%s)", usersWithShare.get(id), id);
-        }
-
-        PdfDocument document = new PdfDocument();
         try{
-
+        // példa az iterálásra a usereken
             QRCodeWriter writer = new QRCodeWriter();
-            try {
-                BitMatrix bitMatrix = writer.encode("Józsi: " + "40", BarcodeFormat.QR_CODE, 512, 512);
-                int width = bitMatrix.getWidth();
-                int height = bitMatrix.getHeight();
-                Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
-                for (int x = 0; x < width; x++) {
-                    for (int y = 0; y < height; y++) {
-                        bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+            int pageNum=1;
+            for (String id : usersWithShare.keySet()) {
+                String infoName = String.format("Név: %s", id);
+                String infoShare = String.format("Tulajdonrész: %s", usersWithShare.get(id));
+
+                PdfDocument.PageInfo.Builder pageBuilder = new PdfDocument.PageInfo.Builder(200,200, pageNum++);
+                PdfDocument.Page page = document.startPage(pageBuilder.create());
+                try {
+                    String tmp = String.format("%s=%s", id, usersWithShare.get(id));
+                    BitMatrix bitMatrix = writer.encode(tmp, BarcodeFormat.QR_CODE, 128, 128);
+                    int width = bitMatrix.getWidth();
+                    int height = bitMatrix.getHeight();
+                    Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+                    for (int x = 0; x < width; x++) {
+                        for (int y = 0; y < height; y++) {
+                            bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                        }
                     }
+//                    LinearLayout l = (LinearLayout) findViewById(R.id.pdfLayout);
+//                    TextView userInfoTextview = (TextView) findViewById(R.id.textUserInfo);
+                    ImageView userQrImg = (ImageView) findViewById(R.id.imgQr);
+                    userQrImg.setImageBitmap(bmp);
+//                    userInfoTextview.setText(info);
+                    Paint p = new Paint();
+                    p.setColor(Color.BLACK);
+                    page.getCanvas().drawText(infoName, 20, 25, p);
+                    page.getCanvas().drawText(infoShare, 20, 40, p);
+                    //userQrImg.draw(page.getCanvas());
+                    page.getCanvas().drawBitmap(bmp, 20, 50, p);
+//                    userInfoTextview.draw(page.getCanvas());
+//                    l.draw(page.getCanvas());
+                    document.finishPage(page);
+                } catch (WriterException e) {
+                    e.printStackTrace();
                 }
-                ((ImageView) findViewById(R.id.imageViewQR)).setImageBitmap(bmp);
 
-            } catch (WriterException e) {
-                e.printStackTrace();
-            }
+        }
 
-            View v = findViewById(android.R.id.content);
-            PdfDocument.PageInfo.Builder pageBuilder = new PdfDocument.PageInfo.Builder(v.getWidth(), v.getHeight(), 1);
-            PdfDocument.Page page = document.startPage(pageBuilder.create());
-            v.draw(page.getCanvas());
-            document.finishPage(page);
 
-            File pdfDirPath = new File(getExternalCacheDir(), "pdfs");
-            pdfDirPath.mkdirs();
-            File file = new File(pdfDirPath, "pdfsend.pdf");
-            FileOutputStream os = new FileOutputStream(file);
-            document.writeTo(os);
+        File pdfDirPath = new File(getExternalCacheDir(), "pdfs");
+        pdfDirPath.mkdirs();
+        File file = new File(pdfDirPath, "shares.pdf");
+        FileOutputStream os = new FileOutputStream(file);
+        document.writeTo(os);
 
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -648,7 +666,6 @@ public class MainMenu extends Activity {
                 document.close();
             }
         }
-
     }
 
 }
