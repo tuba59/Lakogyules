@@ -1,6 +1,12 @@
 <resources>
-    <string name="app_name">Lakogyules</string>
+    <string name="app_name">Lakógyűlés++</string>
 
-    <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
+    <string name="about_activity_name">Készítők</string>
+    <string name="button_set_voters">Szavazók megadása</string>
+    <string name="button_start_vote">Szavazás indítás</string>
+    <string name="button_create_poll_sheet">Szavazólapok elkészítése</string>
+    <string name="button_about">Készítők</string>
+    <string name="text_authors">Kertész József, Turi Barnabás\n2015. All rights reserved.</string>
+    <string name="button_rate_app">Rate app</string>
 </resources>

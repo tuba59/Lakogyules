@@ -10,10 +10,9 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.auth.GoogleAuthException;
 import com.google.api.client.extensions.android.http.AndroidHttp;
@@ -33,10 +32,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-public class MainMenu extends GoogleConnect  {
+public class MainMenuActivity extends GoogleConnect  {
     ProgressDialog mProgress;
-    private TextView mOutputText;
-
     private String voteResult;
     private String currentSheetName;
     private String currentVoterName;
@@ -46,7 +43,6 @@ public class MainMenu extends GoogleConnect  {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
-        mOutputText = (TextView) findViewById(R.id.textViewDebug);
         mProgress = new ProgressDialog(this);
         mProgress.setMessage("Google Apps Script futtatása ...");
 
@@ -57,6 +53,7 @@ public class MainMenu extends GoogleConnect  {
                 .setBackOff(new ExponentialBackOff())
                 .setSelectedAccountName(settings.getString(PREF_ACCOUNT_NAME, null));
 
+        final Intent aboutIntent = new Intent(this, AboutActivity.class);
         final Button setUsers = (Button) findViewById(R.id.button_users);
         setUsers.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -64,8 +61,8 @@ public class MainMenu extends GoogleConnect  {
                 if (isGooglePlayServicesAvailable()) {
                     executeScript(API_SET_USERS_SCRIPT);
                 } else {
-                    mOutputText.setText("Google Play Services required: " +
-                            "after installing, close and relaunch this app.");
+                    Toast.makeText(getBaseContext(), "Google Play Services required: " +
+                            "after installing, close and relaunch this app.", Toast.LENGTH_LONG).show();
                 }
             }
         });
@@ -91,7 +88,7 @@ public class MainMenu extends GoogleConnect  {
 
             @Override
             public void onClick(View v) {
-
+                startActivity(aboutIntent);
             }
         });
 
@@ -133,7 +130,7 @@ public class MainMenu extends GoogleConnect  {
                     }
                     executeScript(API_SET_USERS_SCRIPT);
                 } else if (resultCode == RESULT_CANCELED) {
-                    mOutputText.setText("Account unspecified.");
+                    Toast.makeText(getBaseContext(), "Account unspecified.", Toast.LENGTH_LONG).show();
                 }
                 break;
             case REQUEST_AUTHORIZATION:
@@ -149,7 +146,7 @@ public class MainMenu extends GoogleConnect  {
                     currentVoterShare = contents.substring(indexOfSeparator+1);
 
                     // 1. Instantiate an AlertDialog.Builder with its constructor
-                    AlertDialog.Builder builder = new AlertDialog.Builder(MainMenu.this);
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MainMenuActivity.this);
 
                     // 2. Chain together various setter methods to set the dialog characteristics
                     builder.setTitle("Szavazat megadása")
@@ -169,7 +166,6 @@ public class MainMenu extends GoogleConnect  {
                                             executeScript(API_DO_VOTE_SCRIPT);
                                             break;
                                     }
-                                    mOutputText.append("\n" + voteResult);
                                     try {
                                         Intent intent = new Intent("com.google.zxing.client.android.SCAN");
                                         intent.putExtra("SCAN_MODE", "QR_CODE_MODE"); // "PRODUCT_MODE for bar codes
@@ -184,7 +180,7 @@ public class MainMenu extends GoogleConnect  {
                             .create()
                             .show();
                 } else if(resultCode == RESULT_CANCELED){
-                    AlertDialog.Builder builder = new AlertDialog.Builder(MainMenu.this);
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MainMenuActivity.this);
                     builder.setMessage("Biztosan befejezi a szavazást?")
                             .setNegativeButton("Nem", new DialogInterface.OnClickListener() {
                                 @Override
@@ -227,7 +223,7 @@ public class MainMenu extends GoogleConnect  {
             if (isDeviceOnline()) {
                 new MakeRequestTask(mCredential, script_name).execute();
             } else {
-                mOutputText.setText("No network connection available.");
+                Toast.makeText(getBaseContext(), "No network connection available.", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -377,13 +373,10 @@ public class MainMenu extends GoogleConnect  {
                                     String.format("%s (%s)", userSet.get(id), id));
                         }
                         if(!userSet.isEmpty())
-                            PdfUtility.generatePDF(userSet, MainMenu.this);
-
+                            PdfUtility.generatePDF(userSet, MainMenuActivity.this);
                         break;
                 }
-
             }
-
             return returnList;
         }
 
@@ -430,7 +423,6 @@ public class MainMenu extends GoogleConnect  {
 
         @Override
         protected void onPreExecute() {
-            mOutputText.setText("");
             mProgress.show();
         }
 
@@ -438,10 +430,8 @@ public class MainMenu extends GoogleConnect  {
         protected void onPostExecute(List<String> output) {
             mProgress.hide();
             if (output == null || output.size() == 0) {
-                mOutputText.setText("No results returned.");
             } else {
                 output.add(0, "Data retrieved using the Google Apps Script Execution API:");
-                mOutputText.setText(TextUtils.join("\n", output));
             }
         }
 
@@ -456,13 +446,13 @@ public class MainMenu extends GoogleConnect  {
                 } else if (mLastError instanceof UserRecoverableAuthIOException) {
                     startActivityForResult(
                             ((UserRecoverableAuthIOException) mLastError).getIntent(),
-                            MainMenu.REQUEST_AUTHORIZATION);
+                            MainMenuActivity.REQUEST_AUTHORIZATION);
                 } else {
-                    mOutputText.setText("The following error occurred:\n"
-                            + mLastError.getMessage());
+                    Toast.makeText(getBaseContext(), "The following error occurred:\n"
+                            + mLastError.getMessage(), Toast.LENGTH_LONG).show();
                 }
             } else {
-                mOutputText.setText("Request cancelled.");
+                Toast.makeText(getBaseContext(), "Request cancelled.", Toast.LENGTH_LONG).show();
             }
         }
     }
