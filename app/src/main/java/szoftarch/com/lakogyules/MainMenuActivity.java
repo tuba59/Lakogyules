@@ -303,7 +303,7 @@ public class MainMenuActivity extends GoogleConnect  {
             ExecutionRequest request = new ExecutionRequest()
                     .setFunction(scriptName)
                     .setParameters(params)
-                    .setDevMode(true);
+                    .setDevMode(false);
 
             // Make the request.
             Operation op =
